@@ -41,5 +41,12 @@ namespace Extensions
 
             return poped;
         }
+
+        public static T Peek<T>(this IList<T> list)
+        {
+            Assert.IsNotNull(list, "List cannot be null.");
+            Assert.IsTrue(list.Count > 0, "Cannot peek from an empty list.");
+            return list[list.Count - 1];
+        }
     }
 }

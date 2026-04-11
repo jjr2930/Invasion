@@ -15,4 +15,6 @@ public class IngameConfig : ScriptableObject
 
     [Header("Player movement options")]
     [SerializeField] public float moveSpeed = 10f;
+
+    [SerializeField] public float customRtt = 0.1f;
 }

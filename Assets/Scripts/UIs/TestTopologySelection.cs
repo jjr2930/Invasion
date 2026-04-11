@@ -5,7 +5,8 @@ public class TestTopologySelection : MonoBehaviour
 {
     [SerializeField] NetworkManager networkManager;
     [SerializeField] Unity.Netcode.NetworkObject serverPrefab;
-
+    [SerializeField] int serverTickRate = 30;
+    [SerializeField] int clientTickRate = 60;
     private void Reset()
     {
         networkManager = GetComponent<NetworkManager>();
@@ -20,8 +21,6 @@ public class TestTopologySelection : MonoBehaviour
     {
         networkManager.StartServer();
         gameObject.SetActive(false);
-
-        Application.targetFrameRate = (int)networkManager.NetworkTickSystem.TickRate;
     }
 
     public void OnClickedClientStart()

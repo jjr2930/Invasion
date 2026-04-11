@@ -46,6 +46,7 @@ public class NetworkServer : NetworkBehaviour
             frameNumber = 0;
             fsm.enabled = true;
             this.enabled = true;
+            Application.targetFrameRate = (int)NetworkManager.NetworkTickSystem.TickRate;
         }
 
         //if(null == networkWorld)
@@ -77,7 +78,7 @@ public class NetworkServer : NetworkBehaviour
 
     IEnumerator SendPacketWithDelay(FrameSnapshot snapshot)
     {
-        yield return new WaitForSeconds(0.1f); // 0.1초 지연
+        yield return new WaitForSeconds(this.ingameConfig.customRtt * 0.5f); // rtt 절반
         // 패킷 전송 로직 작성
 
         SendSnapshotRpc(snapshot);
@@ -97,7 +98,7 @@ public class NetworkServer : NetworkBehaviour
         {
             FrameSnapshot snapshot = new FrameSnapshot();
             snapshot.frameNumber = frameNumber;
-            snapshot.creationTime = Time.time;
+            snapshot.creationTime = NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat;
 
             //느릴거 같은데?
             foreach (KeyValuePair<ulong, NetworkObject> pair in NetworkManagerExtensions.GetInstance().SpawnManager.SpawnedObjects)

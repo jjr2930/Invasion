@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -28,9 +28,9 @@ public class NetworkInput : NetworkBehaviour
             firePressed = firePressed
         };
 
-        if(IsClient)
+        if (IsClient)
         {
-            UpdateInputRpc(inputPacket);
+            StartCoroutine(StartSendUpdateInput(inputPacket));
 
             //UnityEngine.Debug.Log($"Sent input from client {OwnerClientId}: Move={inputPacket.move}, Look={inputPacket.look}, fire: {inputPacket.firePressed}");
             ClientEventBus.Input.onInput?.Invoke(inputPacket, OwnerClientId);
@@ -102,6 +102,13 @@ public class NetworkInput : NetworkBehaviour
     public void OnMove(InputAction.CallbackContext context)
     {
         move = context.ReadValue<Vector2>();
+    }
+
+    public IEnumerator StartSendUpdateInput(InputPacket input)
+    {
+        yield return new WaitForSeconds(0.05f);
+
+        UpdateInputRpc(input);
     }
 
     [Rpc(SendTo.Server)]

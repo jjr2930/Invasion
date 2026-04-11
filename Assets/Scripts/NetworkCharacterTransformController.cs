@@ -8,6 +8,7 @@ using UnityEngine;
 
 public class NetworkCharacterTransformController : NetworkComponent
 {
+    [Serializable]
     public class MoveSnapshot
     {
         /// <summary>
@@ -54,51 +55,153 @@ public class NetworkCharacterTransformController : NetworkComponent
     [SerializeField, Range(1f, 10f)] float movingSpeed;
     [SerializeField] int clientSnapshotCount = 0;
     [SerializeField] Vector3 positionGap;
-    [SerializeField, Range(0.00001f, 1f)] float positionTolerance;
+    [SerializeField, Range(0.0f, 10f)] float positionToleranceMultiplier = 2;
+    [SerializeField, Range(0.0001f, 3f)] float targetTimeServerFrameTolerance = 2;
+    [SerializeField, Range(0.0001f, 3f)] float targetTimeClientFrameTolerance = 2;
+    [SerializeField] IngameConfig ingameConfig;
+    [SerializeField, Range(-1f, 1f)] float timeCorrection = 0f;
 
     [Header("Debug")]
     [SerializeField] int receivedSnapshotCount = 0;
     [SerializeField] int resimulatedSnapshotCount = 0;
     [SerializeField] int goodSimulatedSnapshotCount = 0;
     [SerializeField] int outOfRangeCount = 0;
-    [SerializeField] int lastSimulatedServerFrameNumber = 0;
+    [SerializeField] uint lastSimulatedServerFrameNumber = 0;
+    [SerializeField] float lastReceivedServerSnapshotTime = 0f;
 
-    List<MoveSnapshot> clientSnapshot = new List<MoveSnapshot>(16);
+    [SerializeField] List<MoveSnapshot> clientSnapshot = new List<MoveSnapshot>(16);
+    [SerializeField] List<MoveSnapshot> snapshotFromServer = new List<MoveSnapshot>(16);
+
     List<MoveSnapshot> tempSnapshot = new List<MoveSnapshot>(16);
 
     public void Update()
     {
-        if (IsServer || IsOwner)
+        if (!IsServer && !IsOwner)
+            return;
+
+        Simulate(moveInput, Time.deltaTime);
+
+        if (this.IsOwnedByLocalPlayer())
         {
-            MoveSnapshot newSnapshot = null;
-            if (IsClient)
+            //Debug.Log("유저가 소유중 스냅샷 만들기와, 보정 작업 시작");
+            clientSnapshot.RemoveAll(s => s.generatedTime < NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat - 1f);
+
+            MoveSnapshot newSnapshot = new MoveSnapshot();
+            newSnapshot.deltaTime = Time.deltaTime;
+            newSnapshot.moveInput = moveInput;
+            newSnapshot.beforePosition = transform.position;
+            newSnapshot.generatedTime = NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat;
+            newSnapshot.afterPosition = transform.position;
+
+            clientSnapshot.Add(newSnapshot);
+            clientSnapshotCount = clientSnapshot.Count;
+
+
+            while (snapshotFromServer.Count > 0)
             {
-                newSnapshot = new MoveSnapshot();
-                newSnapshot.deltaTime = Time.deltaTime;
-                newSnapshot.moveInput = moveInput;
-                newSnapshot.beforePosition = transform.position;
-            }
+                int foundLeftIndex = -1;
+                MoveSnapshot serverSnapshot = snapshotFromServer.Dequeue();
+                if (serverSnapshot.frameNumber < lastSimulatedServerFrameNumber)
+                    continue;
 
-            Simulate(moveInput, Time.deltaTime);
+                lastSimulatedServerFrameNumber = serverSnapshot.frameNumber;
+                MoveSnapshot interpolated = null;
 
-            if (IsClient)
-            {
-                //if (positionGap != Vector3.zero)
-                //{
-                //    Debug.Log($"positionGap: {positionGap}");
+                if (clientSnapshot.Count < 2)
+                {
+                    Debug.Log($"보간점 찾기 위한 스냅샷 부족, clientSnapshotCount : {clientSnapshot.Count}");
+                    continue;
+                }
 
-                //    transform.position -= positionGap;
-                //    positionGap = Vector3.zero;
-                //}
+                bool goodSimulation = false;
+                float serverOneFrameDuration = 1f / NetworkManager.NetworkTickSystem.TickRate;
+                float clientOneFrameDuration = 1f / Application.targetFrameRate;
+                float clientHalfFrameDuration = clientOneFrameDuration * 0.5f;
 
-                //clientSnapshot.RemoveAll(snapshot => snapshot.used);
-                //clientSnapshot.RemoveAll(snapshot => snapshot.time < Time.time - 3f);
+                //테스트용 RTT, 실제론 네트워크에서 측정된 RTT값을 사용해야함
+                float halfRtt = ingameConfig.customRtt * 0.5f;
+                float positionTolerance = movingSpeed * clientOneFrameDuration * positionToleranceMultiplier;
 
-                clientSnapshotCount = clientSnapshot.Count;
+                for (int i = 0; i < clientSnapshot.Count - 1; i++)
+                {
+                    MoveSnapshot clientLeftSnapshot = clientSnapshot[i];
+                    MoveSnapshot clientRightSnapshot = clientSnapshot[i + 1];
+                    float targetTime = serverSnapshot.generatedTime - halfRtt;
+                    targetTime -= serverOneFrameDuration * targetTimeServerFrameTolerance;
+                    targetTime -= clientOneFrameDuration * targetTimeClientFrameTolerance;
+                    targetTime += timeCorrection;
 
-                newSnapshot.generatedTime = Time.time;
-                newSnapshot.afterPosition = transform.position;
-                clientSnapshot.Add(newSnapshot);
+                    if (clientLeftSnapshot.generatedTime <= targetTime && targetTime <= clientRightSnapshot.generatedTime)
+                    {
+                        float rate = (targetTime - clientLeftSnapshot.generatedTime) / (clientRightSnapshot.generatedTime - clientLeftSnapshot.generatedTime);
+                        interpolated = MoveSnapshot.Lerp(clientLeftSnapshot, clientRightSnapshot, rate);
+                        if (MathUtility.ApproximatleyEqual(interpolated.afterPosition, serverSnapshot.afterPosition, positionTolerance))
+                        {
+                            Debug.Log($"시뮬레이션 적중({positionTolerance})");
+                            goodSimulatedSnapshotCount++;
+                            goodSimulation = true;
+                            break;
+                        }
+                        else
+                        {
+                            float distance = Vector3.Magnitude(interpolated.afterPosition - serverSnapshot.afterPosition);
+                            Debug.Log($"시뮬레이션 빗나감({distance} >= {positionTolerance}), 서버 위치 : {serverSnapshot.afterPosition}, 서버 시간 : {serverSnapshot.generatedTime}, 타겟 시간: {targetTime}, 보간된 위치 : {interpolated.afterPosition}, 보간점 시간 : {interpolated.generatedTime}, 위치 차이 : {(serverSnapshot.afterPosition - interpolated.afterPosition).magnitude}");
+                            foundLeftIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (goodSimulation)
+                {
+                    //Debug.Log("서버에서 보낸 스냅샷과 클라이언트 시뮬레이션 결과가 유사함, 재시뮬레이션 필요 없음");
+                    continue;
+                }
+
+                if (null == interpolated)
+                {
+                    Debug.Log($"보간점 찾지 못함, 서버 시간 {serverSnapshot.generatedTime}, 첫번 째 스냅샷 시간 : {clientSnapshot[0].generatedTime}, 마지막 스냅샷 시간 : {clientSnapshot.Peek().generatedTime}" +
+                        $"");
+                    continue;
+                }
+
+                //Debug.Log($"보간점 찾음, index : {foundIndex}, 재시뮬레이션 시작");
+
+                tempSnapshot.Clear();
+                MoveSnapshot prev = interpolated;
+                for (int i = foundLeftIndex + 1; i < clientSnapshot.Count; ++i)
+                {
+                    transform.position = serverSnapshot.afterPosition;
+                    var beforePosition = transform.position;
+                    float delta = clientSnapshot[i].generatedTime - prev.generatedTime;
+
+                    Simulate(clientSnapshot[i].moveInput, delta);
+
+                    MoveSnapshot resimulatedSnapshot = new MoveSnapshot()
+                    {
+                        moveInput = clientSnapshot[i].moveInput,
+                        deltaTime = delta,
+                        beforePosition = beforePosition,
+                        generatedTime = prev.generatedTime + delta,
+                        afterPosition = transform.position
+                    };
+                    tempSnapshot.Add(resimulatedSnapshot);
+
+                    prev = resimulatedSnapshot;
+                }
+
+                clientSnapshot.Clear();
+                clientSnapshot.AddRange(tempSnapshot);
+                if (tempSnapshot.Count == 0)
+                {
+                    Debug.Log($"재시뮬레이션할 스냅샷이 없음");
+                    continue;
+                }
+                else
+                {
+                    Debug.Log($"서버 시간: {serverSnapshot.generatedTime}, 서버 위치: {serverSnapshot.afterPosition}, 재시뮬레이션된 최종 위치: {transform.position}, 재시뮬레이션 마지막 시간 : {tempSnapshot.Peek().generatedTime}, 지금 서버시간 : {NetworkManager.ServerTime.TimeAsFloat}");
+                    //Debug.Break();
+                }
             }
         }
     }
@@ -154,122 +257,20 @@ public class NetworkCharacterTransformController : NetworkComponent
 
     private void OnFrameSnapshotReceived(FrameSnapshot snapshot)
     {
-        if (lastSimulatedServerFrameNumber > snapshot.frameNumber)
-        {
-            Debug.Log($"서버로부터 받은 스냅샷 프레임 번호 : {snapshot.frameNumber}, 마지막으로 시뮬레이션한 서버 프레임 번호 : {lastSimulatedServerFrameNumber}, 무시합니다.");
-            return;
-        }
-
         if (!snapshot.netObjectSnapshotById.TryGetValue(NetworkObjectId, out var objectSnapshot))
             return;
 
-        receivedSnapshotCount++;
-
-        var snapshotFromServer = new MoveSnapshot()
+        var newServerSnapshot = new MoveSnapshot()
         {
             generatedTime = snapshot.creationTime,
             afterPosition = objectSnapshot.position,
             frameNumber = snapshot.frameNumber
         };
 
+        snapshotFromServer.Add(newServerSnapshot);
+        lastReceivedServerSnapshotTime = snapshot.creationTime;
 
-        ulong rtt = NetworkManagerExtensions.GetInstance().NetworkConfig.NetworkTransport.GetCurrentRtt(OwnerClientId);
-        //float rttInSec = ((float)rtt) / 1000f;
-        //float halfRttInSec = rttInSec / 2f;
-        float halfRttInSec = 0.05f; //for test
-        float targetTime = snapshotFromServer.generatedTime - halfRttInSec;
-        Debug.Log($"서버에서 스냅샷 받음, 생성 시간 : {snapshotFromServer.generatedTime}, 위치 : {snapshotFromServer.afterPosition}, 프레임 번호 : {snapshotFromServer.frameNumber}, HalfRTT : {halfRttInSec}");
-
-        int leftIndex = -1;
-        int rightIndex = -1;
-
-        MoveSnapshot left = null;
-        MoveSnapshot right = null;
-        MoveSnapshot interpolated = null;
-
-        try
-        {
-            Debug.Log($"보간점 찾기 시작 목표 시간:{snapshotFromServer.generatedTime}");
-
-            for (int i = 0; i < clientSnapshot.Count - 1; i++)
-            {
-                left = clientSnapshot[i];
-                right = clientSnapshot[i + 1];
-
-                if (left.generatedTime <= targetTime && targetTime <= right.generatedTime)
-                {
-                    float rate = (targetTime - left.generatedTime) / (right.generatedTime - left.generatedTime);
-                    interpolated = MoveSnapshot.Lerp(left, right, rate);
-                    leftIndex = i;
-                    rightIndex = i + 1;
-                    Debug.Log($"보간점 찾음 left time : {left.generatedTime}, right time : {right.generatedTime}, target time : {targetTime}, rate : {rate}");
-                    break;
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            outOfRangeCount++;
-            Debug.Log($"범위 초과");
-            return;
-        }
-
-        if (null == interpolated)
-        {
-            Debug.Log($"보간 점을 찾지 못함, client snapshot count : {clientSnapshot.Count}");
-            return;
-        }
-
-        //good simulation!
-        if (MathUtility.ApproximatleyEqual(interpolated.afterPosition, snapshotFromServer.afterPosition, positionTolerance))
-        {
-            Debug.Log("Good Simulation!");
-            goodSimulatedSnapshotCount++;
-            return;
-        }
-
-        Debug.Log($"보간점 위치: {interpolated.afterPosition}, 서버의 스냅샷 위치 : {snapshotFromServer.afterPosition}, 오차 : {(interpolated.afterPosition - snapshotFromServer.afterPosition).magnitude}, 허용 오차 : {positionTolerance}");
-        resimulatedSnapshotCount++;
-
-        //resimulation!
-        Debug.Log("Resimulation!");
-
-        clientSnapshot.RemoveRange(0, leftIndex);
-        Debug.Log($"left item generationtime : {left.generatedTime}, targetTime : {targetTime}");
-
-        float deltaTime = right.generatedTime - interpolated.generatedTime;
-        float elapsedTime = interpolated.generatedTime;
-        MoveSnapshot currentSnapshot = interpolated;
-
-        tempSnapshot.Clear();
-
-        while (clientSnapshot.Count > 0)
-        {
-            Debug.Log($"남은 스냅샷 : {clientSnapshot.Count}, deltaTime : {deltaTime}, elapsedTime : {elapsedTime}, currentTime : {currentSnapshot.generatedTime}, curDelta: {currentSnapshot.deltaTime}");
-            transform.position = currentSnapshot.beforePosition;
-            Simulate(currentSnapshot.moveInput, deltaTime);
-
-            tempSnapshot.Add(new MoveSnapshot()
-            {
-                generatedTime = elapsedTime + deltaTime,
-                afterPosition = transform.position,
-                moveInput = currentSnapshot.moveInput,
-                deltaTime = deltaTime,
-                used = false
-            });
-
-            elapsedTime += deltaTime;
-
-            currentSnapshot = clientSnapshot.Dequeue();
-            deltaTime = currentSnapshot.deltaTime;
-        }
-
-        clientSnapshot.Clear();
-        clientSnapshot.AddRange(tempSnapshot);
-        lastSimulatedServerFrameNumber = (int)snapshotFromServer.frameNumber;
-
-        Debug.Log($"시뮬래이션 후 위치 : {transform.position}");
-        //Debug.Break();
+        //Debug.Log($"서버에서 프레임 스냅샷 받음, 서버 시간 : {snapshot.creationTime}, 서버 위치 : {objectSnapshot.position}, 스냅샷 큐에 추가, 현재 큐 길이 : {snapshotFromServer.Count}");
     }
 
     private void UpdateLookInput(InputPacket packet, ulong senderId)
