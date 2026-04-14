@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Unity.Netcode;
@@ -11,6 +12,7 @@ namespace Jy.Packets
     {
         public uint frameNumber;
         public float creationTime;
+        public double doubleTime;
         public Dictionary<ulong, NetworkObjectSnapshot> netObjectSnapshotById
             = new Dictionary<ulong, NetworkObjectSnapshot>(32);
 
@@ -18,6 +20,7 @@ namespace Jy.Packets
         {
             serializer.SerializeValue(ref frameNumber);
             serializer.SerializeValue(ref creationTime);
+            serializer.SerializeValue(ref doubleTime);
 
             ulong[] keys = null;
             NetworkObjectSnapshot[] values = null;

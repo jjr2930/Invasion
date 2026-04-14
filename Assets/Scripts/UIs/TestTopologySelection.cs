@@ -1,4 +1,5 @@
-﻿using Unity.Netcode;
+﻿using System;
+using Unity.Netcode;
 using UnityEngine;
 
 public class TestTopologySelection : MonoBehaviour
@@ -14,24 +15,52 @@ public class TestTopologySelection : MonoBehaviour
     private void Start()
     {
         networkManager.OnServerStarted += OnServerStarted;
+        networkManager.OnServerStopped += OnServerStopped;
+        networkManager.OnClientStarted += OnClientStarted;
+        networkManager.OnClientStopped += OnClientStopped;
+
         Application.targetFrameRate = 60;
+    }
+
+    void OnDestroy()
+    {
+        networkManager.OnServerStarted -= OnServerStarted;
+        networkManager.OnServerStopped -= OnServerStopped;
+        networkManager.OnClientStarted -= OnClientStarted;
+        networkManager.OnClientStopped -= OnClientStopped;
+    }
+
+    private void OnServerStopped(bool obj)
+    {
+        gameObject.SetActive(true);
+    }
+
+    private void OnClientStarted()
+    {
+        gameObject.SetActive(false);
+    }
+
+    private void OnClientStopped(bool obj)
+    {
+        gameObject.SetActive(true);
     }
 
     public void OnClickedServerStart()
     {
         networkManager.StartServer();
-        gameObject.SetActive(false);
+        Debug.Log("Server Started");
     }
 
     public void OnClickedClientStart()
     {
         networkManager.StartClient();
-        gameObject.SetActive(false);
     }
 
     private void OnServerStarted()
     {
         Debug.Log("ServerStarted");
         Unity.Netcode.NetworkObject spawnedServer = serverPrefab.InstantiateAndSpawn(networkManager);
+
+        gameObject.SetActive(false);
     }
 }

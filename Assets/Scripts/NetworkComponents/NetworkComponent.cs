@@ -1,5 +1,4 @@
-﻿using NUnit.Framework;
-using Unity.Netcode;
+﻿using Unity.Netcode;
 using UnityEngine;
 
 namespace Jy.NetworkComponents

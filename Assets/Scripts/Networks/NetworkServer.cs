@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using Jy.Packets;
 using Unity.Netcode;
@@ -71,6 +72,11 @@ public class NetworkServer : NetworkBehaviour
         currentWorldSnapshot.DebugPrint(GetEntityId().ToString());
         //SendSnapshotRpc(currentWorldSnapshot);
 
+        if(currentWorldSnapshot.creationTime > NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat)
+        {
+            Debug.Log($"생성된 서버 스냅샷이 너무 미래에 생성된 스냅샷임, 서버 시간 : {currentWorldSnapshot.creationTime}, 현재 서버 시간 : {NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat}");
+        }
+
         StartCoroutine(SendPacketWithDelay(currentWorldSnapshot));
 
         frameSnapshotContainer.Add(currentWorldSnapshot);
@@ -99,6 +105,7 @@ public class NetworkServer : NetworkBehaviour
             FrameSnapshot snapshot = new FrameSnapshot();
             snapshot.frameNumber = frameNumber;
             snapshot.creationTime = NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat;
+            snapshot.doubleTime = NetworkManager.ServerTime.Time;
 
             //느릴거 같은데?
             foreach (KeyValuePair<ulong, NetworkObject> pair in NetworkManagerExtensions.GetInstance().SpawnManager.SpawnedObjects)

@@ -121,12 +121,13 @@ public class NetworkCharacterTransformController : NetworkComponent
                 //테스트용 RTT, 실제론 네트워크에서 측정된 RTT값을 사용해야함
                 float halfRtt = ingameConfig.customRtt * 0.5f;
                 float positionTolerance = movingSpeed * clientOneFrameDuration * positionToleranceMultiplier;
+                float targetTime = 0;
 
                 for (int i = 0; i < clientSnapshot.Count - 1; i++)
                 {
                     MoveSnapshot clientLeftSnapshot = clientSnapshot[i];
                     MoveSnapshot clientRightSnapshot = clientSnapshot[i + 1];
-                    float targetTime = serverSnapshot.generatedTime - halfRtt;
+                    targetTime = serverSnapshot.generatedTime - halfRtt;
                     targetTime -= serverOneFrameDuration * targetTimeServerFrameTolerance;
                     targetTime -= clientOneFrameDuration * targetTimeClientFrameTolerance;
                     targetTime += timeCorrection;
@@ -160,8 +161,7 @@ public class NetworkCharacterTransformController : NetworkComponent
 
                 if (null == interpolated)
                 {
-                    Debug.Log($"보간점 찾지 못함, 서버 시간 {serverSnapshot.generatedTime}, 첫번 째 스냅샷 시간 : {clientSnapshot[0].generatedTime}, 마지막 스냅샷 시간 : {clientSnapshot.Peek().generatedTime}" +
-                        $"");
+                    Debug.Log($"보간점 찾지 못함, 서버 시간 {serverSnapshot.generatedTime}, 찾으려는 시간 : {targetTime}, 첫번 째 스냅샷 시간 : {clientSnapshot[0].generatedTime}, 마지막 스냅샷 시간 : {clientSnapshot.Peek().generatedTime}, 현재 서버시간 : {NetworkManager.ServerTime.TimeAsFloat}");
                     continue;
                 }
 
@@ -266,6 +266,16 @@ public class NetworkCharacterTransformController : NetworkComponent
             afterPosition = objectSnapshot.position,
             frameNumber = snapshot.frameNumber
         };
+
+        // if(snapshot.creationTime > NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat)
+        // {
+        //     Debug.Log($"받은 서버 스냅샷이 너무 미래에 생성된 스냅샷임, 서버 시간 : {snapshot.creationTime}, 현재 서버 시간 : {NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat}");
+        // }
+
+        if(snapshot.doubleTime > NetworkManager.ServerTime.Time)
+        {
+            Debug.Log($"받은 서버 스냅샷이 너무 미래에 생성된 스냅샷임, 서버 doubleTime : {snapshot.doubleTime}, 현재 doubleTime : {NetworkManager.ServerTime.Time}");
+        }
 
         snapshotFromServer.Add(newServerSnapshot);
         lastReceivedServerSnapshotTime = snapshot.creationTime;
