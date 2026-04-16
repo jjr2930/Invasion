@@ -30,7 +30,7 @@ public class NetworkInput : NetworkBehaviour
 
         if (IsClient)
         {
-            StartCoroutine(StartSendUpdateInput(inputPacket));
+            UpdateInputRpc(inputPacket);
 
             //UnityEngine.Debug.Log($"Sent input from client {OwnerClientId}: Move={inputPacket.move}, Look={inputPacket.look}, fire: {inputPacket.firePressed}");
             ClientEventBus.Input.onInput?.Invoke(inputPacket, OwnerClientId);

@@ -70,25 +70,19 @@ public class NetworkServer : NetworkBehaviour
         frameNumber++;
         var currentWorldSnapshot = MakeCurrentWorldSnapshot();
         currentWorldSnapshot.DebugPrint(GetEntityId().ToString());
-        //SendSnapshotRpc(currentWorldSnapshot);
-
-        if(currentWorldSnapshot.creationTime > NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat)
-        {
-            Debug.Log($"생성된 서버 스냅샷이 너무 미래에 생성된 스냅샷임, 서버 시간 : {currentWorldSnapshot.creationTime}, 현재 서버 시간 : {NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat}");
-        }
-
-        StartCoroutine(SendPacketWithDelay(currentWorldSnapshot));
+        
+        SendSnapshotRpc(currentWorldSnapshot);
 
         frameSnapshotContainer.Add(currentWorldSnapshot);
     }
 
-    IEnumerator SendPacketWithDelay(FrameSnapshot snapshot)
-    {
-        yield return new WaitForSeconds(this.ingameConfig.customRtt * 0.5f); // rtt 절반
-        // 패킷 전송 로직 작성
+    // IEnumerator SendPacketWithDelay(FrameSnapshot snapshot)
+    // {
+    //     yield return new WaitForSeconds(this.ingameConfig.customRtt * 0.5f); // rtt 절반
+    //     // 패킷 전송 로직 작성
 
-        SendSnapshotRpc(snapshot);
-    }
+    //     SendSnapshotRpc(snapshot);
+    // }
 
     [Rpc(SendTo.NotServer)]
     private void SendSnapshotRpc(FrameSnapshot frameSnapshot, RpcParams rpcParam = default)
@@ -106,6 +100,7 @@ public class NetworkServer : NetworkBehaviour
             snapshot.frameNumber = frameNumber;
             snapshot.creationTime = NetworkManagerExtensions.GetInstance().ServerTime.TimeAsFloat;
             snapshot.doubleTime = NetworkManager.ServerTime.Time;
+            snapshot.ms = DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond;
 
             //느릴거 같은데?
             foreach (KeyValuePair<ulong, NetworkObject> pair in NetworkManagerExtensions.GetInstance().SpawnManager.SpawnedObjects)

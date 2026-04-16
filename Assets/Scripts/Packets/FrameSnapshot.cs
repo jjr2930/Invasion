@@ -16,11 +16,14 @@ namespace Jy.Packets
         public Dictionary<ulong, NetworkObjectSnapshot> netObjectSnapshotById
             = new Dictionary<ulong, NetworkObjectSnapshot>(32);
 
+        public long ms;
+
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref frameNumber);
             serializer.SerializeValue(ref creationTime);
-            serializer.SerializeValue(ref doubleTime);
+            serializer.SerializeValue(ref doubleTime);          
+            serializer.SerializeValue(ref ms);
 
             ulong[] keys = null;
             NetworkObjectSnapshot[] values = null;
@@ -161,7 +164,7 @@ namespace Jy.Packets
         {
             sb.Clear();
 
-            sb.AppendLine($"FrameNumber : {frameNumber}, CreationTime : {creationTime}");
+            sb.AppendLine($"FrameNumber : {frameNumber}, CreationTime : {creationTime}, localtime : {NetworkManagerExtensions.GetInstance().LocalTime.TimeAsFloat}");
             foreach (var pair in netObjectSnapshotById)
             {
                 sb.AppendLine($"NetworkId : {pair.Key}, Position : {pair.Value.position}, Rotation : {pair.Value.rotation}");
