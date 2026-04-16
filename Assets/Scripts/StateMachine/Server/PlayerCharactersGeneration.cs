@@ -38,15 +38,10 @@ namespace States
 
                 Assert.IsNotNull(spawnedCharacterNetworkObject, $"Failed to spawn player character for client {client.ClientId}.");
 
-                //NetworkPlayerCharacter spawnedNetworkPlayerCharacter
-                //    = spawnedCharacterNetworkObject.GetComponent<NetworkPlayerCharacter>();
+                NetworkPlayerCharacter spawnedNetworkPlayerCharacter
+                    = spawnedCharacterNetworkObject.GetComponent<NetworkPlayerCharacter>();
 
-                //spawnedNetworkPlayerCharacter.SetInitialPositionRpc(randomPoint.transform.position, Quaternion.identity);
-
-                NetworkCharacterTransformController transformController
-                    = spawnedCharacterNetworkObject.GetComponent<NetworkCharacterTransformController>();
-
-                transformController.SetInitPositionRpc(randomPoint.transform.position, Quaternion.identity);
+                spawnedNetworkPlayerCharacter.SetInitialPositionRpc(randomPoint.transform.position, Quaternion.identity);
 
                 NetworkPlayer netowrkPlayer = client.PlayerObject.GetComponent<NetworkPlayer>();
                 Assert.IsNotNull(netowrkPlayer, $"The player object for client {client.ClientId} does not have a NetworkPlayer component.");

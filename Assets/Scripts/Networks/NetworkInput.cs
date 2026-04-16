@@ -14,6 +14,8 @@ public class NetworkInput : NetworkBehaviour
     [SerializeField] Vector2 look;
     [SerializeField] Vector2 move;
     [SerializeField] bool firePressed;
+    [SerializeField] bool inverseLookX;
+    [SerializeField] bool inverseLookY;
 
     private InputAction lookAction;
     private InputAction moveAction;
@@ -97,6 +99,14 @@ public class NetworkInput : NetworkBehaviour
     public void OnLook(InputAction.CallbackContext context)
     {
         look = context.ReadValue<Vector2>();
+        if (inverseLookX)
+        {
+            look.x = -look.x;
+        }
+        if (inverseLookY)
+        {
+            look.y = -look.y;
+        }
     }
 
     public void OnMove(InputAction.CallbackContext context)

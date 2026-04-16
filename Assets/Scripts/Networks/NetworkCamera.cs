@@ -29,9 +29,6 @@ public class NetworkCamera : NetworkComponent
 
     [SerializeField, Range(0.0001f, 10f)] float lookSensitivity = 1f;
 
-    [SerializeField] bool inversY;
-    [SerializeField] bool inversX;
-
     [Header("internal value")]
     [SerializeField] float elevationAngle;
 
@@ -50,8 +47,8 @@ public class NetworkCamera : NetworkComponent
         Ray ray = this.ScreenPointToRay(clientScreenCenter);
 
 
-        Debug.DrawLine(ray.origin, ray.GetPoint(10f), Color.red);
-        Debug.DrawLine(transform.position, transform.position + transform.forward * 10, Color.green);
+        //Debug.DrawLine(ray.origin, ray.GetPoint(10f), Color.red);
+        //Debug.DrawLine(transform.position, transform.position + transform.forward * 10, Color.green);
     }
 
 
@@ -69,6 +66,8 @@ public class NetworkCamera : NetworkComponent
 
         Gizmos.color = Color.red;
         Gizmos.DrawSphere(transform.position, 0.2f);
+
+        Debug.Log($"Camera position: {transform.position}, forward: {transform.forward}, ray origin: {ray.origin}, ray direction: {ray.direction}");
     }
 
     private void LateUpdate()
@@ -125,7 +124,7 @@ public class NetworkCamera : NetworkComponent
 
     public override void RegisterClientSideListeners()
     {
-        base .RegisterClientSideListeners();
+        base.RegisterClientSideListeners();
         ClientEventBus.Input.onInput += UpdateLookInput;
     }
 
@@ -152,9 +151,6 @@ public class NetworkCamera : NetworkComponent
         {
             return;
         }
-
-        input.look.y = (inversY ? -input.look.y : input.look.y);
-
         var delta = input.look.y * Time.deltaTime * lookSensitivity;
         elevationAngle += delta;
         elevationAngle = elevationMinMax.Clamp(elevationAngle);

@@ -1,24 +1,36 @@
 ﻿using System;
+using Jy.NetworkComponents;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-public class NetworkPlayerCharacter : NetworkBehaviour
+public class NetworkPlayerCharacter : NetworkComponent
 {
+    [Serializable]
+    public class MaterialContainer
+    {
+        public Material localMaterial;
+        public Material remoteMaterial;
+    }
+
+
     [Header("References")]
-    [SerializeField] Material localMaterial;
-    [SerializeField] Material remoteMaterial;
+    [SerializeField] MaterialContainer logicMaterial;
+    [SerializeField] MaterialContainer visualMaterial;
+
     [SerializeField] MeshRenderer meshRenderer;
 
     [SerializeField] CharacterController cc;
     [SerializeField] PlayerCharacterStat stat;
+    [SerializeField] GameObject visualPrefab;
+    [SerializeField] Transform visualInstance;
     [SerializeField] IngameConfig config;
 
     [Header("Thresholds")]
     [SerializeField, Range(0.0001f, 1f)]
     float lookThreshold = 0.1f;
     [SerializeField, Range(0.0001f, 10f)]
-    float lookSensitivity = 1f;
+    float rotateSpeed = 1f;
 
     [Header("Current stat")]
     [SerializeField] int currentHealth;
@@ -37,22 +49,26 @@ public class NetworkPlayerCharacter : NetworkBehaviour
         if (!IsSpawned)
             return;
 
-        //Debug.Log($"current delta time : {Time.deltaTime}");
+        if (!IsServer)
+            return;
 
-        if (IsOwner || IsServer)
-        {
+        transform.Rotate(transform.up, currentInput.look.x * Time.deltaTime * rotateSpeed);
 
-            //if (Mathf.Abs(currentInput.look.x) >= lookThreshold)
-            //{
-            //    transform.Rotate(Vector3.up, currentInput.look.x * Time.deltaTime * lookSensitivity);
-            //}
+        Vector3 moveDirection = new Vector3(currentInput.move.x, 0f, currentInput.move.y);
+        moveDirection = this.transform.rotation * moveDirection;
+        Vector3 nextVelocity = moveDirection * config.moveSpeed;
+        cc.Move(nextVelocity * Time.deltaTime);
+    }
 
-            Vector3 moveDirection = new Vector3(currentInput.move.x, 0f, currentInput.move.y);
-            //Debug.Log($"Received input from client {senderId}, move: {moveDirection}, look: {look}");
-            moveDirection = this.transform.rotation * moveDirection;
-            Vector3 nextVelocity = moveDirection * config.moveSpeed;
-            cc.Move(nextVelocity * Time.deltaTime);
-        }
+    public void LateUpdate()
+    {
+        if (!IsClient)
+            return;
+
+        Vector3 nextPosition = positionLerper.Lerp(visualInstance.position, this.transform.position);
+        Quaternion nextRotation = rotationLerper.Lerp(visualInstance.rotation, this.transform.rotation);
+
+        visualInstance.SetPositionAndRotation(nextPosition, nextRotation);
     }
 
     protected override void OnNetworkPostSpawn()
@@ -61,54 +77,45 @@ public class NetworkPlayerCharacter : NetworkBehaviour
 
         currentInput = new InputPacket();
 
+        Material selectedVisualMaterial = null;
         if (this.IsOwnedByLocalPlayer())
         {
-            meshRenderer.material = localMaterial;
+            meshRenderer.material = logicMaterial.localMaterial;
             ClientEventBus.Networks.OnLocalPlayerCharacterSpawned?.Invoke(this);
+
+            selectedVisualMaterial = visualMaterial.localMaterial;
         }
         else
         {
-            meshRenderer.material = remoteMaterial;
+            meshRenderer.material = logicMaterial.remoteMaterial;
+
+            selectedVisualMaterial = visualMaterial.remoteMaterial;
         }
 
-        gameObject.name = $"NetworkPlayerCharacter_{OwnerClientId}";
-
-        if (IsServer)
-            RegisterServcerSideListeners();
-
         if (IsClient)
-            RegisterClientSideListeners();
+        {
+            visualInstance = Instantiate(visualPrefab, this.transform.position, this.transform.rotation).transform;
+            visualInstance.name = $"NetworkPlayer Visual {OwnerClientId}";
+
+            var visualRenderer = visualInstance.GetComponent<Renderer>();
+            visualRenderer.material = selectedVisualMaterial;
+        }
+
+
+        gameObject.name = $"NetworkPlayer Logic {OwnerClientId}";
     }
 
-
-    public override void OnNetworkDespawn()
+    public override void RegisterServerSideListeners()
     {
-        base.OnNetworkDespawn();
+        base.RegisterServerSideListeners();
 
-        if (IsServer)
-            UnregisterServerSideListeners();
-
-        if (IsClient)
-            UnregisterClientSideListeners();
-    }
-
-    private void RegisterClientSideListeners()
-    {
-        ClientEventBus.Input.onInput += OnInputReceived;
-    }
-
-    private void UnregisterClientSideListeners()
-    {
-        ClientEventBus.Input.onInput -= OnInputReceived;
-    }
-
-    public void RegisterServcerSideListeners()
-    {
         ServerEventBus.Input.onInputReceived += OnInputReceived;
     }
 
-    public void UnregisterServerSideListeners()
+    public override void UnregisterServerSideListeners()
     {
+        base.UnregisterServerSideListeners();
+
         ServerEventBus.Input.onInputReceived -= OnInputReceived;
     }
 

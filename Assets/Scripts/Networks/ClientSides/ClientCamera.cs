@@ -5,6 +5,8 @@ public class ClientCamera : MonoBehaviour
 {
     [SerializeField] Transform networkCameraTransform;
     [SerializeField] IngameConfig config;
+    [SerializeField] float lerpSpeed = 5f;
+    [SerializeField] float rotationLerpSpeed = 5f;
 
     public void Start()
     {
@@ -25,7 +27,10 @@ public class ClientCamera : MonoBehaviour
             return;
         }
 
-        this.transform.SetPositionAndRotation(networkCameraTransform.position, networkCameraTransform.rotation);
+        Vector3 nextPosition = Vector3.Lerp(this.transform.position, networkCameraTransform.position, lerpSpeed * Time.deltaTime);
+        Quaternion nextRotation = Quaternion.Slerp(this.transform.rotation, networkCameraTransform.rotation, rotationLerpSpeed * Time.deltaTime);
+
+        this.transform.SetPositionAndRotation(nextPosition, nextRotation);
     }
 
     private void OnNetworkCameraSpawned(NetworkCamera camera)

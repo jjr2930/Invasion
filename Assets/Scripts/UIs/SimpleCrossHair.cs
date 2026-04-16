@@ -1,7 +1,18 @@
-﻿using UnityEngine;
+﻿using Unity.Netcode;
+using UnityEngine;
 
-public class SimpleCrossHair : MonoBehaviour
+public class SimpleCrossHair : NetworkBehaviour
 {
+
+    protected override void OnNetworkPostSpawn()
+    {
+        base.OnNetworkPostSpawn();
+
+        if (!IsClient)
+            Destroy(this);
+    }
+
+
     private void OnGUI()
     {
         Vector2 center = new Vector2(Screen.width / 2, Screen.height / 2);

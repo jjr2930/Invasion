@@ -1,9 +1,10 @@
 ﻿using System;
+using Jy.NetworkComponents;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-public class FireModule : NetworkBehaviour
+public class FireModule : NetworkComponent
 {
     [SerializeField, Range(0.001f, 1f)]
     float fireDelay;
@@ -13,42 +14,27 @@ public class FireModule : NetworkBehaviour
     [SerializeField] NetworkCamera ownerCamera;
     [SerializeField] PlayerCharacterStat stat;
     [SerializeField] LayerMask hitlayerMask;
-
-    protected override void OnNetworkPostSpawn()
-    {
-        base.OnNetworkPostSpawn();
-
-        if (IsServer)
-        {
-            RegisterListenersRpc();
-        }
-    }
-
-    public override void OnNetworkDespawn()
-    {
-        base.OnNetworkDespawn();
-
-        if (IsServer)
-        {
-            UnregisterListenersRpc();
-        }
-    }
+    [SerializeField] NetworkObject hitPointVisual;
 
     private void Update()
     {
         if (IsServer)
-            UpdateServerRpc();
+            FireIfNeed();
     }
 
-    [Rpc(SendTo.Server)]
-    void UpdateServerRpc()
+    void FireIfNeed()
     {
         if (!firePressed)
+        {
+            Debug.Log("Fire button is not pressed for client id: " + OwnerClientId);
             return;
+        }
 
         float currentTime = Time.time;
         if (currentTime < nextFiredTime)
             return;
+
+        Debug.Log("Fire");
 
         nextFiredTime = currentTime + fireDelay;
 
@@ -59,23 +45,29 @@ public class FireModule : NetworkBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, 1000f, hitlayerMask.value))
         {
-            NetworkPlayerCharacter target = hit.transform.GetComponent<NetworkPlayerCharacter>();
-            Assert.IsNotNull(target, "Hit object does not have NetworkPlayerCharacter component. Hit object: " + hit.transform.name);
+            Debug.Log("Hit object: " + hit.transform.name + " at position: " + hit.point);
+            var instance = Instantiate(hitPointVisual, position: hit.point, rotation: Quaternion.identity);
+            instance.Spawn();
 
-            target.Hit(stat.damage);
+            //NetworkPlayerCharacter target = hit.transform.GetComponent<NetworkPlayerCharacter>();
+            //Assert.IsNotNull(target, "Hit object does not have NetworkPlayerCharacter component. Hit object: " + hit.transform.name);
+
+            //target.Hit(stat.damage);
         }
     }
 
-    [Rpc(SendTo.Server)]
-    private void RegisterListenersRpc()
+    public override void RegisterServerSideListeners()
     {
+        base.RegisterServerSideListeners();
+
         ServerEventBus.Spawning.onNetworkCameraSpawned += OnNetworkCameraSpawned;
         ServerEventBus.Input.onInputReceived += OnInputReceived;
     }
 
-    [Rpc(SendTo.Server)]
-    private void UnregisterListenersRpc()
+    public override void UnregisterServerSideListeners()
     {
+        base.UnregisterServerSideListeners();
+
         ServerEventBus.Spawning.onNetworkCameraSpawned -= OnNetworkCameraSpawned;
         ServerEventBus.Input.onInputReceived -= OnInputReceived;
     }
