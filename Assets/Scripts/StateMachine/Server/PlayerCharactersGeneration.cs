@@ -66,9 +66,7 @@ namespace States
             base.OnStateUpdate(animator, stateInfo, layerIndex);
 
             if (Time.time > startTime + waitingTime)
-                return;
-
-            animator.SetTrigger("Complete");
+                animator.SetTrigger("Complete");
         }
     }
 }

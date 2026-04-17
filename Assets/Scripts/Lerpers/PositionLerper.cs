@@ -13,6 +13,8 @@ public struct PositionLerper
     // The duration of the interpolation, in seconds
     [SerializeField, Range(0.00001f, 1f)] float duration;
 
+    [SerializeField] float warpDistance;
+
     public float Duration { get => duration; set => duration = value; }
 
     /// <summary>
@@ -23,6 +25,13 @@ public struct PositionLerper
     /// <returns> A Vector3 value between current and target. </returns>
     public Vector3 Lerp(Vector3 current, Vector3 target)
     {
+        if(Vector3.SqrMagnitude(current - target) >= warpDistance)
+        {
+            m_LerpStart = target;
+            current = target;
+            return target;
+        }
+
         if (current != target)
         {
             m_LerpStart = current;

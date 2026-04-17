@@ -2,21 +2,14 @@
 using Jy.NetworkComponents;
 using MinMax;
 using Unity.Netcode;
+using UnityEditor.ShaderGraph;
 using UnityEngine;
 using UnityEngine.Assertions;
 
 [DefaultExecutionOrder(ExecutionOrders.NetworkCamera)]
 public class NetworkCamera : NetworkComponent
 {
-    [Header("Camera static options")]
-    [SerializeField] float fov;
-    [SerializeField] float aspectRatio;
-    [SerializeField] Vector2 screenSize;
-    [SerializeField] float near;
-    [SerializeField] float far;
-
     [Header("References")]
-    [SerializeField] IngameConfig ingameConfig;
     [SerializeField] Unity.Netcode.NetworkObject followTarget;
 
     [Header("Camera dynamic options")]
@@ -32,46 +25,21 @@ public class NetworkCamera : NetworkComponent
     [Header("internal value")]
     [SerializeField] float elevationAngle;
 
-    private void Awake()
-    {
-        fov = ingameConfig.fov;
-        aspectRatio = ingameConfig.aspectRatio;
-        screenSize = ingameConfig.resolution;
-        near = ingameConfig.near;
-        far = ingameConfig.far;
-    }
-
-    private void Update()
-    {
-        Vector2 clientScreenCenter = this.GetScreenCenter();
-        Ray ray = this.ScreenPointToRay(clientScreenCenter);
-
-
-        //Debug.DrawLine(ray.origin, ray.GetPoint(10f), Color.red);
-        //Debug.DrawLine(transform.position, transform.position + transform.forward * 10, Color.green);
-    }
-
-
     private void OnDrawGizmos()
     {
         if (!Application.isPlaying)
             return;
 
-        Vector2 clientScreenCenter = this.GetScreenCenter();
-        Ray ray = this.ScreenPointToRay(clientScreenCenter);
+        Ray ray = new Ray(this.transform.position, this.transform.forward);
         Gizmos.color = Color.red;
-        Gizmos.DrawLine(ray.origin, ray.GetPoint(10f));
-        Gizmos.color = Color.green;
-        Gizmos.DrawLine(transform.position, transform.position + transform.forward * 10);
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawSphere(transform.position, 0.2f);
-
-        Debug.Log($"Camera position: {transform.position}, forward: {transform.forward}, ray origin: {ray.origin}, ray direction: {ray.direction}");
+        Gizmos.DrawLine(ray.origin, ray.direction * 10f);
     }
 
     private void LateUpdate()
     {
+        if(IsClient)
+            return;
+
         if (null == followTarget)
             return;
 
@@ -101,10 +69,7 @@ public class NetworkCamera : NetworkComponent
         base.OnNetworkPostSpawn();
 
         if (IsClient)
-        {
-            SetScreenSizeRpc(new Vector2(Screen.width, Screen.height));
             ClientEventBus.Networks.OnNetworkCameraSpawned?.Invoke(this);
-        }
 
         this.gameObject.name = $"NetworkCamera_{this.OwnerClientId}";
     }
@@ -122,31 +87,11 @@ public class NetworkCamera : NetworkComponent
         ServerEventBus.Input.onInputReceived -= UpdateLookInput;
     }
 
-    public override void RegisterClientSideListeners()
-    {
-        base.RegisterClientSideListeners();
-        ClientEventBus.Input.onInput += UpdateLookInput;
-    }
-
-    public override void UnregisterClientSideListeners()
-    {
-        base.UnregisterClientSideListeners();
-        ClientEventBus.Input.onInput -= UpdateLookInput;
-    }
-    public void RegisterServerSideInputListenerRpc()
-    {
-        Debug.Log($"Registering input listener for camera {this.NetworkObjectId} owned by client {this.OwnerClientId}");
-        ServerEventBus.Input.onInputReceived += UpdateLookInput;
-    }
-
-    public void UnregisterServerSideInputListenerRpc()
-    {
-        Debug.Log($"Unregistering input listener for camera {this.NetworkObjectId} owned by client {this.OwnerClientId}");
-        ServerEventBus.Input.onInputReceived -= UpdateLookInput;
-    }
-
     public void UpdateLookInput(InputPacket input, ulong senderId)
     {
+        if(IsClient)
+            return;
+
         if (senderId != this.OwnerClientId)
         {
             return;
@@ -156,59 +101,6 @@ public class NetworkCamera : NetworkComponent
         elevationAngle = elevationMinMax.Clamp(elevationAngle);
     }
 
-
-    [Rpc(SendTo.Server)]
-    public void SetScreenSizeRpc(Vector2 size)
-    {
-        screenSize = size;
-        aspectRatio = screenSize.x / screenSize.y;
-    }
-
-    public Vector2 GetScreenCenter()
-    {
-        return new Vector2(screenSize.x, screenSize.y) * 0.5f;
-    }
-
-    /// <summary>
-    /// only support perspective
-    /// </summary>
-    /// <param name="screenPoint"></param>
-    /// <returns></returns>
-    public Ray ScreenPointToRay(Vector2 screenPoint)
-    {
-        // -------------------------
-        // 1. Screen → NDC
-        // -------------------------
-        float x = (screenPoint.x / screenSize.x) * 2f - 1f;
-        float y = (screenPoint.y / screenSize.y) * 2f - 1f;
-
-        // Clip space (near plane)
-        Vector4 clip = new Vector4(x, y, -1f, 1f);
-
-        // -------------------------
-        // 2. Projection Matrix
-        // -------------------------
-        Matrix4x4 proj = Matrix4x4.Perspective(fov, aspectRatio, near, far);
-        Matrix4x4 invProj = proj.inverse;
-
-        // Clip → View
-        Vector4 view = invProj * clip;
-        view /= view.w;
-
-        // -------------------------
-        // 3. Camera Transform
-        // -------------------------
-        Matrix4x4 camToWorld = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
-
-        // View → World (direction)
-        Vector3 dir = camToWorld.MultiplyVector(view).normalized;
-
-        // -------------------------
-        // 4. Ray 생성
-        // -------------------------
-        return new Ray(transform.position, -dir);
-    }
-
     [Rpc(SendTo.Everyone)]
     public void SetFollowTargetRpc(ulong targetObjectId)
     {
@@ -216,5 +108,10 @@ public class NetworkCamera : NetworkComponent
         Assert.IsNotNull(targetObj, $"Failed to find target object with NetworkObjectId {targetObjectId} to follow.");
 
         followTarget = targetObj;
+    }
+
+    public Ray GetFireRay()
+    {
+        return new Ray(transform.position, transform.forward);
     }
 }

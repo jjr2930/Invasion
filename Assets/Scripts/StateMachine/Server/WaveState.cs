@@ -27,16 +27,7 @@ namespace States
             }
             Assert.IsNotNull(monsterSpawnPoints, "Monster prefab is not assigned.");
             Assert.IsTrue(monsterSpawnPoints.Length > 0, "No monster spawn points found in the scene.");
-        }
 
-        public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
-        {
-            base.OnStateUpdate(animator, stateInfo, layerIndex);
-
-            if (nextSpawnTime >= Time.time)
-                return;
-
-            nextSpawnTime = Time.time + spawnDelayRange.Random();
 
             int spawnCount = spawnCountRange.Random();
 

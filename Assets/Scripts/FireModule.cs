@@ -11,7 +11,7 @@ public class FireModule : NetworkComponent
 
     [SerializeField] bool firePressed;
     [SerializeField] float nextFiredTime;
-    [SerializeField] NetworkCamera ownerCamera;
+    [SerializeField] NetworkCamera networkCamera;
     [SerializeField] PlayerCharacterStat stat;
     [SerializeField] LayerMask hitlayerMask;
     [SerializeField] NetworkObject hitPointVisual;
@@ -26,7 +26,7 @@ public class FireModule : NetworkComponent
     {
         if (!firePressed)
         {
-            Debug.Log("Fire button is not pressed for client id: " + OwnerClientId);
+            //Debug.Log("Fire button is not pressed for client id: " + OwnerClientId);
             return;
         }
 
@@ -34,14 +34,13 @@ public class FireModule : NetworkComponent
         if (currentTime < nextFiredTime)
             return;
 
-        Debug.Log("Fire");
+        //Debug.Log("Fire");
 
         nextFiredTime = currentTime + fireDelay;
 
-        Assert.IsNotNull(ownerCamera, "Owner camera is null for client id: " + OwnerClientId);
+        Assert.IsNotNull(networkCamera, "Owner camera is null for client id: " + OwnerClientId);
 
-        Vector2 clientScreenCenter = ownerCamera.GetScreenCenter();
-        Ray ray = ownerCamera.ScreenPointToRay(clientScreenCenter);
+        Ray ray = networkCamera.GetFireRay();
 
         if (Physics.Raycast(ray, out RaycastHit hit, 1000f, hitlayerMask.value))
         {
@@ -76,7 +75,7 @@ public class FireModule : NetworkComponent
     {
         if (camera.OwnerClientId == OwnerClientId)
         {
-            ownerCamera = camera;
+            networkCamera = camera;
         }
     }
 

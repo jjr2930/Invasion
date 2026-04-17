@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Assertions;
 
 [DefaultExecutionOrder(ExecutionOrders.ClientCamera)]
 public class ClientCamera : MonoBehaviour

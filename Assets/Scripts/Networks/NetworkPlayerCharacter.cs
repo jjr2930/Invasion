@@ -103,6 +103,9 @@ public class NetworkPlayerCharacter : NetworkComponent
 
 
         gameObject.name = $"NetworkPlayer Logic {OwnerClientId}";
+
+        if(IsClient)
+            networkServer.ReadyRpc();
     }
 
     public override void RegisterServerSideListeners()
