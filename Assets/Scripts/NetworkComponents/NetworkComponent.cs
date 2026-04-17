@@ -22,7 +22,6 @@ namespace Jy.NetworkComponents
             if(IsServer)
             {
                 RegisterServerSideListeners();
-                //networkServer.NetworkWorld.Add(OwnerClientId, this);
             }
             else if(IsClient)
             {

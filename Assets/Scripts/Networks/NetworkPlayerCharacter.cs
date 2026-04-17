@@ -103,9 +103,6 @@ public class NetworkPlayerCharacter : NetworkComponent
 
 
         gameObject.name = $"NetworkPlayer Logic {OwnerClientId}";
-
-        if(IsClient)
-            networkServer.ReadyRpc();
     }
 
     public override void RegisterServerSideListeners()
@@ -158,5 +155,10 @@ public class NetworkPlayerCharacter : NetworkComponent
             currentHealth = 0;
             // Handle death, e.g., respawn or disable character
         }
+    }
+
+    public void OnTriggerEnter(Collider other)
+    {
+        Debug.Log($"Trigger entered by {other.gameObject.name}");
     }
 }

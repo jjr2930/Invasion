@@ -1,4 +1,6 @@
 ﻿using System;
+using MinMax;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -7,10 +9,10 @@ namespace States.Monster
     public class Move : MonsterStateBase
     {
         [SerializeField] NavMeshAgent navMeshAgent;
-        [SerializeField, Range(1f, 10f)] float pathfindingInterval = 5f;
-        [SerializeField] float lastPathfindingTime;
-
-        NetworkPlayerCharacter user;
+        [SerializeField] MinMaxFloat pathfindingIntervalRange ;
+        [SerializeField] float nextPathfindingTime;
+        [SerializeField] float stopDistance = 0.5f;
+        [SerializeField] float refindingDistance = 3f;
 
         protected override void Init(Animator animator)
         {
@@ -18,51 +20,38 @@ namespace States.Monster
             base.Init(animator);
         }
 
-        public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
+        public override void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
         {
-            base.OnStateUpdate(animator, stateInfo, layerIndex);
+            base.OnStateEnter(animator, stateInfo, layerIndex);
 
-            if (lastPathfindingTime + pathfindingInterval > Time.time)
-                return;
-
-            if (user == null)
-            {
-                user = FindClosestPlayer(animator.transform);
-                if (user == null)
-                {
-                    //notfound...
-                    return;
-                }
-            }
-
+            Transform target = blackboard.Get<Transform>("Target"); 
 
             if (!navMeshAgent.isOnNavMesh)
                 return;
 
-            Debug.Log($"this:{animator.gameObject.name} re pathfinding find : {user.name}");
-            
-            navMeshAgent.SetDestination(user.transform.position);
-            lastPathfindingTime = Time.time;
+            navMeshAgent.SetDestination(target.position);
         }
 
-        private NetworkPlayerCharacter FindClosestPlayer(Transform thisTransform)
+        public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
         {
-            NetworkPlayerCharacter closestCharacter = null;
-            float closestDistance = float.MaxValue;
+            base.OnStateUpdate(animator, stateInfo, layerIndex);
 
-            NetworkPlayerCharacter[] allCharacters = FindObjectsByType<NetworkPlayerCharacter>();
+            if (nextPathfindingTime > Time.time)
+                return;
 
-            foreach (var charcter in allCharacters)
-            {
-                float distance = Vector3.Distance(thisTransform.position, charcter.transform.position);
-                if (distance < closestDistance)
-                {
-                    closestDistance = distance;
-                    closestCharacter = charcter;
-                }
-            }
+            nextPathfindingTime = Time.time + pathfindingIntervalRange.Random();
 
-            return closestCharacter;
+            Transform target = blackboard.Get<Transform>("Target"); 
+
+            float agentDestinationSqrDistance = Vector3.SqrMagnitude(navMeshAgent.destination - target.position);
+            bool targetPositionChanged = agentDestinationSqrDistance >= refindingDistance * refindingDistance;
+
+            if(targetPositionChanged)
+                navMeshAgent.SetDestination(target.position);
+
+            bool isArrived = !navMeshAgent.pathPending && navMeshAgent.remainingDistance <= stopDistance;
+            if (isArrived)
+                animator.SetTrigger("Complete");
         }
     }
 }

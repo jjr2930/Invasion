@@ -17,6 +17,10 @@ public class FsmBlackboardEditor : Editor
         base.OnInspectorGUI();
 
         ReadOnlyDictionary<string, BlackboardVariable> variables = Script.Varibles;
+        if(null == variables)
+        {
+            return;
+        }
 
         using(new EditorGUILayout.VerticalScope())
         {
@@ -24,7 +28,8 @@ public class FsmBlackboardEditor : Editor
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                
+                    EditorGUILayout.LabelField(variable.Key);
+                    EditorGUILayout.LabelField(variable.Value.GetType().ToString());
                 }
             }
         }
