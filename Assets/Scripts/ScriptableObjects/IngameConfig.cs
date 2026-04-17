@@ -9,4 +9,6 @@ public class IngameConfig : ScriptableObject
     [SerializeField] public float moveSpeed = 10f;
 
     [SerializeField] public float customRtt = 0.1f;
+
+    [SerializeField] public float maintainDuration = 20f;
 }
