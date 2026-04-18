@@ -7,6 +7,8 @@ namespace States.Monster
     {
         [SerializeField] bool initialized = false;
         [SerializeField] protected FsmBlackboard blackboard = null;
+        [SerializeField] protected NetworkMonster networkMonster = null;
+
         public override void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
         {
             base.OnStateEnter(animator, stateInfo, layerIndex);
@@ -22,6 +24,8 @@ namespace States.Monster
             initialized = true;
 
             blackboard = animator.GetComponent<FsmBlackboard>();
+
+            networkMonster = animator.GetComponent<NetworkMonster>();
         }
     }
 }

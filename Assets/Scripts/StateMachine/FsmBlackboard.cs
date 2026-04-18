@@ -1,12 +1,8 @@
-
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using NUnit.Framework;
-using Unity.VisualScripting;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-using UnityEngine.AI;
 
 [Serializable]
 public class BlackboardVariable

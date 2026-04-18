@@ -1,4 +1,5 @@
-﻿using Unity.Netcode;
+﻿using Invasion.Tables.Runtime;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -8,13 +9,16 @@ public class NetworkMonster : NetworkBehaviour
     [SerializeField] Animator fsmAnimator;
     [SerializeField] NavMeshAgent navMeshAgent;
     [SerializeField] GameObject visualPrefab;
+    [SerializeField] MonsterStatTable monsterStatTable;
 
     [Header("Runtime references")]
     [SerializeField] Transform visualInstance;
+    [field:SerializeField] public int TableKey{ get; set; }
 
     [Header("Interpolation")]
     [SerializeField] PositionLerper positionLerper;
     [SerializeField] RotationLerper rotationLerper;
+    
 
     public void SetDestination(Vector3 destination)
     {

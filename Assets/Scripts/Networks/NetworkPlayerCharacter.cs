@@ -1,4 +1,6 @@
 ﻿using System;
+using Invasion;
+using Invasion.Tables.Runtime;
 using Jy.NetworkComponents;
 using Unity.Netcode;
 using UnityEngine;
@@ -21,6 +23,8 @@ public class NetworkPlayerCharacter : NetworkComponent
     [SerializeField] MeshRenderer meshRenderer;
 
     [SerializeField] CharacterController cc;
+    [SerializeField] PlayerCharacterStatTable statTable;
+    [SerializeField] int statTableKey;
     [SerializeField] PlayerCharacterStat stat;
     [SerializeField] GameObject visualPrefab;
     [SerializeField] Transform visualInstance;
@@ -34,7 +38,6 @@ public class NetworkPlayerCharacter : NetworkComponent
 
     [Header("Current stat")]
     [SerializeField] int currentHealth;
-    [SerializeField] float moveSpeed;
 
     [Header("Interpolation")]
     [SerializeField] PositionLerper positionLerper;
@@ -101,7 +104,7 @@ public class NetworkPlayerCharacter : NetworkComponent
             visualRenderer.material = selectedVisualMaterial;
         }
 
-
+        currentHealth = stat.health;
         gameObject.name = $"NetworkPlayer Logic {OwnerClientId}";
     }
 
@@ -150,6 +153,8 @@ public class NetworkPlayerCharacter : NetworkComponent
         Assert.IsTrue(IsServer, "Hit method can only be called on the server.");
 
         currentHealth -= damage;
+        Debug.Log($"Player {OwnerClientId} hit with damage {damage}. Current health: {currentHealth}");
+        
         if (currentHealth <= 0)
         {
             currentHealth = 0;
@@ -159,6 +164,16 @@ public class NetworkPlayerCharacter : NetworkComponent
 
     public void OnTriggerEnter(Collider other)
     {
-        Debug.Log($"Trigger entered by {other.gameObject.name}");
+        IAttackable attackable = other.GetComponent<IAttackable>();
+        Assert.IsNotNull(attackable, $"Collided object {other.gameObject.name} does not implement IAttackable.");
+
+        int damage = attackable.GetDamage();
+        Hit(damage);
+    }
+
+    public void SetTableKey(int key)
+    {
+        statTableKey = key;
+        stat = statTable.Get<PlayerCharacterStat>(statTableKey);
     }
 }

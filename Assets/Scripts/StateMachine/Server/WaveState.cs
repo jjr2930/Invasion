@@ -1,4 +1,5 @@
 ﻿using MinMax;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -12,8 +13,9 @@ namespace States
         [SerializeField] MinMaxInt spawnCountRange;
         [SerializeField] float nextSpawnTime;
         [SerializeField] NetworkMonsterSpawnHandler spawnHandler;
-
         [SerializeField] bool initialized = false;
+        [SerializeField] int remainMonsterCount;
+
         public override void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
         {
             base.OnStateEnter(animator, stateInfo, layerIndex);
@@ -33,12 +35,27 @@ namespace States
 
             for (int i = 0; i < spawnCount; i++)
             {
-
                 int spawnPointIndex = Random.Range(0, monsterSpawnPoints.Length);
                 MonsterSpawnPoint spawnPoint = monsterSpawnPoints[spawnPointIndex];
-                NetworkManagerExtensions.SpawnManager.InstantiateAndSpawn(spawnHandler.PooledMonsterPrefab,
-                    position: spawnPoint.transform.position,
-                    rotation: spawnPoint.transform.rotation);
+                NetworkObject spawnedMonster = NetworkManagerExtensions.SpawnManager
+                    .InstantiateAndSpawn(spawnHandler.PooledMonsterPrefab,
+                        position: spawnPoint.transform.position,
+                        rotation: spawnPoint.transform.rotation);
+
+                NetworkMonster networkMonster = spawnedMonster.GetComponent<NetworkMonster>();
+                networkMonster.TableKey = 0;
+            }
+
+            remainMonsterCount = spawnCount;
+        }
+
+        public override void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
+        {
+            base.OnStateUpdate(animator, stateInfo, layerIndex);
+
+            if(remainMonsterCount <= 0)
+            {
+                animator.SetTrigger("Complete");
             }
         }
     }

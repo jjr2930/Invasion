@@ -1,4 +1,5 @@
 ﻿using System;
+using Invasion.Tables.Runtime;
 using Jy.NetworkComponents;
 using Unity.Netcode;
 using UnityEngine;
@@ -12,7 +13,8 @@ public class FireModule : NetworkComponent
     [SerializeField] bool firePressed;
     [SerializeField] float nextFiredTime;
     [SerializeField] NetworkCamera networkCamera;
-    [SerializeField] PlayerCharacterStat stat;
+    [SerializeField] PlayerCharacterStatTable stat;
+    [SerializeField] int tableKey;
     [SerializeField] LayerMask hitlayerMask;
     [SerializeField] NetworkObject hitPointVisual;
 
